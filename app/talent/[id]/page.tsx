@@ -152,8 +152,30 @@ export default function FreelancerProfilePage() {
     window.location.href = `/employer/jobs/new?freelancer=${params.id}`
   }
 
-  const handleMessage = () => {
-    setShowMessageModal(true)
+  const handleMessage = async () => {
+    try {
+      // Create or get existing conversation
+      const response = await fetch('/api/messages/conversations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          participantId: params.id
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Redirect to messages page with the conversation
+        window.location.href = `/messages?conversation=${data.conversation.id}`
+      } else {
+        setShowMessageModal(true) // Fallback to modal
+      }
+    } catch (error) {
+      console.error('Error creating conversation:', error)
+      setShowMessageModal(true) // Fallback to modal
+    }
   }
 
   if (loading) {

@@ -6,6 +6,7 @@ import { useSession, signOut } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
+import NotificationCenter from '@/components/notifications/NotificationCenter'
 import { cn } from '@/lib/utils'
 
 const Header: React.FC = () => {
@@ -17,6 +18,7 @@ const Header: React.FC = () => {
   const navigation = [
     { name: 'Find Talent', href: '/talent', roles: ['EMPLOYER', 'ADMIN'] },
     { name: 'Find Work', href: '/jobs', roles: ['FREELANCER', 'ADMIN'] },
+    { name: 'Messages', href: '/messages', roles: ['EMPLOYER', 'FREELANCER', 'ADMIN'] },
     { name: 'How It Works', href: '/how-it-works', roles: ['EMPLOYER', 'FREELANCER', 'ADMIN'] },
     { name: 'Pricing', href: '/pricing', roles: ['EMPLOYER', 'FREELANCER', 'ADMIN'] },
   ]
@@ -94,11 +96,13 @@ const Header: React.FC = () => {
                 <div className="rounded-full bg-gray-300 h-8 w-8"></div>
               </div>
             ) : session ? (
-              <div className="relative">
-                <button
-                  onClick={() => setIsProfileOpen(!isProfileOpen)}
-                  className="flex items-center space-x-3 text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
+              <>
+                <NotificationCenter />
+                <div className="relative">
+                  <button
+                    onClick={() => setIsProfileOpen(!isProfileOpen)}
+                    className="flex items-center space-x-3 text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
                   <Avatar
                     src={session.user.image || undefined}
                     name={session.user.name || session.user.email}
@@ -152,7 +156,8 @@ const Header: React.FC = () => {
                     </button>
                   </div>
                 )}
-              </div>
+                </div>
+              </>
             ) : (
               <div className="flex items-center space-x-4">
                 <Link
