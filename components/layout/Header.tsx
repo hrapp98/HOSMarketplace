@@ -21,11 +21,33 @@ const Header: React.FC = () => {
     { name: 'Pricing', href: '/pricing', roles: ['EMPLOYER', 'FREELANCER', 'ADMIN'] },
   ]
 
-  const userNavigation = [
-    { name: 'Dashboard', href: '/dashboard' },
-    { name: 'Profile', href: '/profile' },
-    { name: 'Settings', href: '/settings' },
-  ]
+  const getUserNavigation = () => {
+    const baseNavigation = [
+      { name: 'Dashboard', href: '/dashboard' },
+      { name: 'Profile', href: '/profile' },
+      { name: 'Settings', href: '/settings' },
+    ]
+
+    if (session?.user.role === 'FREELANCER') {
+      return [
+        ...baseNavigation.slice(0, 1), // Dashboard
+        { name: 'My Applications', href: '/freelancer/applications' },
+        ...baseNavigation.slice(1) // Profile, Settings
+      ]
+    }
+
+    if (session?.user.role === 'EMPLOYER') {
+      return [
+        ...baseNavigation.slice(0, 1), // Dashboard  
+        { name: 'My Jobs', href: '/employer/jobs' },
+        ...baseNavigation.slice(1) // Profile, Settings
+      ]
+    }
+
+    return baseNavigation
+  }
+
+  const userNavigation = getUserNavigation()
 
   const filteredNavigation = navigation.filter(item => 
     !session || item.roles.includes(session.user.role)
