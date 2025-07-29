@@ -34,6 +34,7 @@ const Header: React.FC = () => {
       return [
         ...baseNavigation.slice(0, 1), // Dashboard
         { name: 'My Applications', href: '/freelancer/applications' },
+        { name: 'Payments', href: '/freelancer/payments' },
         ...baseNavigation.slice(1) // Profile, Settings
       ]
     }

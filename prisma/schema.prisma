@@ -77,6 +77,7 @@ model User {
   reviews           Review[]           @relation("ReviewAuthor")
   reviewsReceived   Review[]           @relation("ReviewRecipient")
   payments          Payment[]
+  paymentsReceived  Payment[]          @relation("PaymentRecipient")
   subscription      Subscription?
   sessions          Session[]
   savedJobs         SavedJob[]
@@ -150,6 +151,8 @@ model FreelancerProfile {
   avgRating           Float            @default(0)
   responseTime        Int              @default(24) // in hours
   successRate         Float            @default(0)
+  stripeAccountId     String?
+  stripeAccountStatus String?          @default("NONE") // NONE, PENDING, VERIFIED
   
   user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   skills              FreelancerSkill[]
@@ -300,6 +303,7 @@ model Application {
   job             Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
   applicant       User              @relation(fields: [applicantId], references: [id], onDelete: Cascade)
   conversations   Conversation[]
+  payments        Payment[]
   
   @@unique([jobId, applicantId])
   @@index([jobId])
@@ -362,22 +366,31 @@ model Review {
 
 model Payment {
   id              String        @id @default(cuid())
-  userId          String
+  userId          String        // The payer (employer)
+  recipientId     String?       // The recipient (freelancer) - optional for non-job payments
+  applicationId   String?       // Link to job application - optional for non-job payments
   amount          Decimal       @db.Decimal(10, 2)
+  platformFee     Decimal       @db.Decimal(10, 2) @default(0)
   currency        String        @default("USD")
-  type            String        // subscription, job_post, featured_listing
+  type            String        // subscription, job_payment, featured_listing
   status          PaymentStatus @default(PENDING)
+  stripePaymentId String?       @unique
   transactionId   String?       @unique
   paymentMethod   String?
   description     String?
   metadata        Json?
+  paidAt          DateTime?     // When payment was completed
   processedAt     DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipient       User?         @relation("PaymentRecipient", fields: [recipientId], references: [id], onDelete: SetNull)
+  application     Application?  @relation(fields: [applicationId], references: [id], onDelete: SetNull)
   
   @@index([userId])
+  @@index([recipientId])
+  @@index([applicationId])
   @@index([status])
   @@index([transactionId])
 }
