@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
+import { SubscriptionStatus } from '@/components/subscriptions/SubscriptionStatus'
 import { formatCurrency, formatRelativeTime } from '@/lib/utils'
 
 interface DashboardStats {
@@ -36,6 +37,18 @@ interface ActiveJob {
   salaryRange?: string
 }
 
+interface Subscription {
+  id: string
+  tier: string
+  startDate: string
+  endDate?: string
+  isActive: boolean
+  jobPostLimit: number
+  jobPostsUsed: number
+  featuredPosts: number
+  autoRenew: boolean
+}
+
 const EmployerDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats>({
     activeJobs: 0,
@@ -47,11 +60,19 @@ const EmployerDashboard: React.FC = () => {
   })
   const [recentApplications, setRecentApplications] = useState<RecentApplication[]>([])
   const [activeJobs, setActiveJobs] = useState<ActiveJob[]>([])
+  const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
+        // Fetch subscription data
+        const subscriptionResponse = await fetch('/api/subscriptions')
+        if (subscriptionResponse.ok) {
+          const subscriptionData = await subscriptionResponse.json()
+          setSubscription(subscriptionData)
+        }
+
         // Mock data for now - replace with actual API calls
         setStats({
           activeJobs: 3,
@@ -348,6 +369,11 @@ const EmployerDashboard: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Subscription Status */}
+        {subscription && (
+          <SubscriptionStatus subscription={subscription} />
+        )}
 
         {/* Active Jobs */}
         <Card>

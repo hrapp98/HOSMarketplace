@@ -46,6 +46,21 @@ export async function POST(req: NextRequest) {
         await handleAccountUpdated(account)
         break
 
+      case 'checkout.session.completed':
+        const session = event.data.object as Stripe.Checkout.Session
+        await handleCheckoutCompleted(session)
+        break
+
+      case 'invoice.payment_succeeded':
+        const invoice = event.data.object as Stripe.Invoice
+        await handleInvoicePaymentSucceeded(invoice)
+        break
+
+      case 'customer.subscription.deleted':
+        const deletedSubscription = event.data.object as Stripe.Subscription
+        await handleSubscriptionDeleted(deletedSubscription)
+        break
+
       default:
         console.log(`Unhandled event type: ${event.type}`)
     }
@@ -192,5 +207,116 @@ async function handleAccountUpdated(account: Stripe.Account) {
     console.log('Account updated:', account.id, 'verified:', isVerified)
   } catch (error) {
     console.error('Error handling account updated:', error)
+  }
+}
+
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  try {
+    if (!session.metadata) {
+      console.error('No metadata found in checkout session')
+      return
+    }
+
+    const { userId, planId, tier } = session.metadata
+
+    // Define subscription limits
+    const tierLimits = {
+      'BASIC': { jobPostLimit: 10, featuredPosts: 2 },
+      'PROFESSIONAL': { jobPostLimit: 50, featuredPosts: 10 },
+      'ENTERPRISE': { jobPostLimit: -1, featuredPosts: -1 }
+    }
+
+    const limits = tierLimits[tier as keyof typeof tierLimits]
+
+    if (!limits) {
+      console.error('Invalid tier in checkout session:', tier)
+      return
+    }
+
+    // Update subscription
+    await prisma.subscription.upsert({
+      where: { userId },
+      update: {
+        tier,
+        jobPostLimit: limits.jobPostLimit,
+        featuredPosts: limits.featuredPosts,
+        isActive: true,
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        autoRenew: true,
+      },
+      create: {
+        userId,
+        tier,
+        jobPostLimit: limits.jobPostLimit,
+        jobPostsUsed: 0,
+        featuredPosts: limits.featuredPosts,
+        isActive: true,
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        autoRenew: true,
+      }
+    })
+
+    // Update payment record
+    await prisma.payment.updateMany({
+      where: {
+        stripePaymentId: session.id,
+        type: 'subscription'
+      },
+      data: {
+        status: 'COMPLETED',
+        paidAt: new Date(),
+        processedAt: new Date(),
+      }
+    })
+
+    // Create notification
+    await prisma.notification.create({
+      data: {
+        userId,
+        type: 'SYSTEM',
+        title: 'Subscription Activated',
+        message: `Your ${tier} plan subscription has been activated successfully!`,
+        data: {
+          tier,
+          planId,
+          sessionId: session.id,
+        }
+      }
+    })
+
+    console.log('Checkout completed:', session.id, 'for user:', userId)
+  } catch (error) {
+    console.error('Error handling checkout completed:', error)
+  }
+}
+
+async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
+  try {
+    if (!invoice.subscription) return
+
+    // Find subscription by Stripe subscription ID
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        // We'll need to store Stripe subscription ID in our schema
+        // For now, we'll update based on customer email
+      }
+    })
+
+    // This would need to be enhanced to properly link Stripe subscriptions
+    console.log('Invoice payment succeeded:', invoice.id)
+  } catch (error) {
+    console.error('Error handling invoice payment succeeded:', error)
+  }
+}
+
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+  try {
+    // Find and deactivate subscription
+    // This would need proper Stripe subscription ID mapping
+    console.log('Subscription deleted:', subscription.id)
+  } catch (error) {
+    console.error('Error handling subscription deleted:', error)
   }
 }
