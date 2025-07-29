@@ -102,6 +102,8 @@ model Profile {
   country     String
   timezone    String?
   language    String[] @default(["English"])
+  website     String?
+  socialLinks Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
@@ -142,7 +144,6 @@ model FreelancerProfile {
   availability        String           @default("Full-time")
   experienceYears     Int              @default(0)
   resume              String?
-  portfolio           String[]
   isAvailable         Boolean          @default(true)
   totalEarned         Decimal          @default(0) @db.Decimal(10, 2)
   totalJobs           Int              @default(0)
@@ -155,6 +156,8 @@ model FreelancerProfile {
   education           Education[]
   experience          Experience[]
   certifications      Certification[]
+  portfolio           Portfolio[]
+  languages           Language[]
   
   @@index([userId])
   @@index([hourlyRate])
@@ -214,6 +217,7 @@ model Experience {
   endDate      DateTime?
   isCurrent    Boolean           @default(false)
   description  String?
+  location     String?
   
   freelancer   FreelancerProfile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
   
@@ -225,10 +229,10 @@ model Certification {
   freelancerId String
   name         String
   issuer       String
-  issueDate    DateTime
-  expiryDate   DateTime?
+  issuedAt     DateTime
+  expiresAt    DateTime?
   credentialId String?
-  url          String?
+  credentialUrl String?
   
   freelancer   FreelancerProfile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
   
@@ -450,4 +454,34 @@ model Report {
   @@index([reporterId])
   @@index([targetId])
   @@index([status])
+}
+
+model Portfolio {
+  id           String            @id @default(cuid())
+  freelancerId String
+  title        String
+  description  String
+  url          String?
+  imageUrl     String?
+  category     String
+  technologies String[]
+  completedAt  DateTime
+  createdAt    DateTime          @default(now())
+  
+  freelancer   FreelancerProfile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  
+  @@index([freelancerId])
+  @@index([category])
+}
+
+model Language {
+  id           String            @id @default(cuid())
+  freelancerId String
+  name         String
+  proficiency  String            // Native, Fluent, Professional, Conversational, Basic
+  
+  freelancer   FreelancerProfile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  
+  @@unique([freelancerId, name])
+  @@index([freelancerId])
 }
