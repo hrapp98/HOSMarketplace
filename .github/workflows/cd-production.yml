@@ -38,7 +38,7 @@ jobs:
           args: --severity-threshold=critical
 
       - name: Run OWASP ZAP security scan
-        uses: zaproxy/action-full-scan@v0.8.0
+        uses: zaproxy/action-full-scan@v0.12.0
         with:
           target: ${{ secrets.STAGING_NEXTAUTH_URL }}
 
