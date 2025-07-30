@@ -30,7 +30,7 @@ jobs:
     
     steps:
       - name: Cleanup Docker images on ${{ matrix.environment }}
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ matrix.environment == 'production' && secrets.PRODUCTION_HOST || secrets.STAGING_HOST }}
           username: ${{ matrix.environment == 'production' && secrets.PRODUCTION_USER || secrets.STAGING_USER }}
@@ -75,7 +75,7 @@ jobs:
     
     steps:
       - name: Cleanup old backups on ${{ matrix.environment }}
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ matrix.environment == 'production' && secrets.PRODUCTION_HOST || secrets.STAGING_HOST }}
           username: ${{ matrix.environment == 'production' && secrets.PRODUCTION_USER || secrets.STAGING_USER }}
@@ -160,7 +160,7 @@ jobs:
     
     steps:
       - name: Cleanup application logs on ${{ matrix.environment }}
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ matrix.environment == 'production' && secrets.PRODUCTION_HOST || secrets.STAGING_HOST }}
           username: ${{ matrix.environment == 'production' && secrets.PRODUCTION_USER || secrets.STAGING_USER }}
@@ -202,7 +202,7 @@ jobs:
     
     steps:
       - name: Run database maintenance on ${{ matrix.environment }}
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ matrix.environment == 'production' && secrets.PRODUCTION_HOST || secrets.STAGING_HOST }}
           username: ${{ matrix.environment == 'production' && secrets.PRODUCTION_USER || secrets.STAGING_USER }}

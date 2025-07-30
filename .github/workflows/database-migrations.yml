@@ -67,7 +67,7 @@ jobs:
     
     steps:
       - name: Create database backup
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ github.event.inputs.environment == 'production' && secrets.PRODUCTION_HOST || secrets.STAGING_HOST }}
           username: ${{ github.event.inputs.environment == 'production' && secrets.PRODUCTION_USER || secrets.STAGING_USER }}
@@ -100,7 +100,7 @@ jobs:
     steps:
       - name: Deploy migrations
         if: github.event.inputs.migration_type == 'deploy'
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ github.event.inputs.environment == 'production' && secrets.PRODUCTION_HOST || secrets.STAGING_HOST }}
           username: ${{ github.event.inputs.environment == 'production' && secrets.PRODUCTION_USER || secrets.STAGING_USER }}
@@ -127,7 +127,7 @@ jobs:
 
       - name: Reset database
         if: github.event.inputs.migration_type == 'reset'
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ github.event.inputs.environment == 'production' && secrets.PRODUCTION_HOST || secrets.STAGING_HOST }}
           username: ${{ github.event.inputs.environment == 'production' && secrets.PRODUCTION_USER || secrets.STAGING_USER }}
@@ -157,7 +157,7 @@ jobs:
 
       - name: Rollback migrations
         if: github.event.inputs.migration_type == 'rollback'
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ github.event.inputs.environment == 'production' && secrets.PRODUCTION_HOST || secrets.STAGING_HOST }}
           username: ${{ github.event.inputs.environment == 'production' && secrets.PRODUCTION_USER || secrets.STAGING_USER }}
@@ -196,7 +196,7 @@ jobs:
     
     steps:
       - name: Verify database state
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ github.event.inputs.environment == 'production' && secrets.PRODUCTION_HOST || secrets.STAGING_HOST }}
           username: ${{ github.event.inputs.environment == 'production' && secrets.PRODUCTION_USER || secrets.STAGING_USER }}
