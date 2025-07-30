@@ -1,8 +1,9 @@
+# Replit configuration for HireOverseas Marketplace
 run = "npm run dev"
-modules = ["nodejs-20", "web", "nix"]
+modules = ["nodejs-20"]
 
 [nix]
-channel = "stable-25_05"
+channel = "stable-24_05"
 
 [env]
 PATH = "/home/runner/$REPL_SLUG/.config/npm/node_global/bin:/home/runner/$REPL_SLUG/node_modules/.bin:$PATH"
@@ -12,7 +13,7 @@ npm_config_prefix = "/home/runner/$REPL_SLUG/.config/npm/node_global"
 requiredFiles = [".replit", "replit.nix", "package.json"]
 
 [deployment]
-run = ["sh", "-c", "npm run dev"]
+run = ["sh", "-c", "npm run build && npm start"]
 deploymentTarget = "cloudrun"
 
 [[ports]]
