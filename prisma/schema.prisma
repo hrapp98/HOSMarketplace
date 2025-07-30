@@ -1,30 +1,220 @@
+// Simplified Prisma schema for SQLite (development only)
+// This gets you running without external PostgreSQL
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
-  ADMIN
-  EMPLOYER
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  type          UserType  @default(FREELANCER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+  profile  Profile?
+  jobs     Job[]
+  applications Application[]
+  sentMessages     Message[] @relation("MessageSender")
+  receivedMessages Message[] @relation("MessageReceiver")
+  reviewsGiven     Review[]  @relation("ReviewGiver")
+  reviewsReceived  Review[]  @relation("ReviewReceiver")
+  payments         Payment[]
+  subscriptions    Subscription[]
+  notifications    Notification[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  title       String?
+  bio         String?
+  skills      String?
+  hourlyRate  Float?
+  experience  String?
+  education   String?
+  portfolio   String?
+  location    String?
+  timezone    String?
+  resume      String?
+  avatar      String?
+  completed   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Job {
+  id          String      @id @default(cuid())
+  title       String
+  description String
+  budget      Float?
+  type        JobType     @default(FIXED)
+  category    String
+  skills      String?
+  duration    String?
+  experience  String?
+  status      JobStatus   @default(OPEN)
+  postedById  String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  postedBy     User          @relation(fields: [postedById], references: [id], onDelete: Cascade)
+  applications Application[]
+}
+
+model Application {
+  id          String            @id @default(cuid())
+  jobId       String
+  freelancerId String
+  coverLetter String?
+  proposal    String?
+  bidAmount   Float?
+  status      ApplicationStatus @default(PENDING)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  job        Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  freelancer User @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, freelancerId])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  content    String
+  senderId   String
+  receiverId String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+}
+
+model Review {
+  id         String @id @default(cuid())
+  rating     Int
+  comment    String?
+  reviewerId String
+  revieweeId String
+  jobId      String?
+  createdAt  DateTime @default(now())
+
+  reviewer User @relation("ReviewGiver", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewee User @relation("ReviewReceiver", fields: [revieweeId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewerId, revieweeId, jobId])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  amount        Float
+  currency      String        @default("USD")
+  status        PaymentStatus @default(PENDING)
+  stripePaymentIntentId String?
+  userId        String
+  jobId         String?
+  description   String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  userId             String
+  plan               SubscriptionPlan
+  status             SubscriptionStatus @default(ACTIVE)
+  stripeSubscriptionId String?
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Enums
+enum UserType {
   FREELANCER
+  EMPLOYER
+  ADMIN
+}
+
+enum JobType {
+  FIXED
+  HOURLY
 }
 
 enum JobStatus {
-  DRAFT
-  ACTIVE
-  FILLED
+  OPEN
+  IN_PROGRESS
+  COMPLETED
   CANCELLED
-  EXPIRED
 }
 
 enum ApplicationStatus {
   PENDING
-  SHORTLISTED
-  INTERVIEW
   ACCEPTED
   REJECTED
   WITHDRAWN
@@ -32,517 +222,26 @@ enum ApplicationStatus {
 
 enum PaymentStatus {
   PENDING
-  PROCESSING
   COMPLETED
   FAILED
   REFUNDED
 }
 
-enum SubscriptionTier {
+enum SubscriptionPlan {
   FREE
   BASIC
-  PROFESSIONAL
-  ENTERPRISE
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
 }
 
 enum NotificationType {
-  JOB_APPLICATION
-  MESSAGE
-  INTERVIEW_REQUEST
-  APPLICATION_STATUS
-  PAYMENT
-  SYSTEM
-}
-
-model User {
-  id                String             @id @default(cuid())
-  email             String             @unique
-  password          String
-  role              UserRole           @default(FREELANCER)
-  emailVerified     DateTime?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  lastActive        DateTime           @default(now())
-  isActive          Boolean            @default(true)
-  isSuspended       Boolean            @default(false)
-  
-  profile           Profile?
-  employerProfile   EmployerProfile?
-  freelancerProfile FreelancerProfile?
-  jobsPosted        Job[]              @relation("EmployerJobs")
-  applications      Application[]
-  conversations     ConversationParticipant[]
-  sentMessages      Message[]
-  notifications     Notification[]
-  reviews           Review[]           @relation("ReviewAuthor")
-  reviewsReceived   Review[]           @relation("ReviewRecipient")
-  payments          Payment[]
-  paymentsReceived  Payment[]          @relation("PaymentRecipient")
-  subscription      Subscription?
-  sessions          Session[]
-  savedJobs         SavedJob[]
-  reportsMade       Report[]           @relation("ReportMaker")
-  reportsReceived   Report[]           @relation("ReportTarget")
-  analyticsEvents   AnalyticsEvent[]
-  
-  @@index([email])
-  @@index([role])
-  @@index([lastActive])
-}
-
-model Profile {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  firstName   String
-  lastName    String
-  avatar      String?
-  phone       String?
-  dateOfBirth DateTime?
-  gender      String?
-  bio         String?
-  location    String?
-  country     String
-  timezone    String?
-  language    String[] @default(["English"])
-  website     String?
-  socialLinks Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-}
-
-model EmployerProfile {
-  id                  String   @id @default(cuid())
-  userId              String   @unique
-  companyName         String
-  companySize         String?
-  industry            String?
-  website             String?
-  description         String?
-  logo                String?
-  establishedYear     Int?
-  taxId               String?
-  isVerified          Boolean  @default(false)
-  verificationDate    DateTime?
-  totalHired          Int      @default(0)
-  totalSpent          Decimal  @default(0) @db.Decimal(10, 2)
-  avgRating           Float    @default(0)
-  
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-  @@index([companyName])
-  @@index([isVerified])
-}
-
-model FreelancerProfile {
-  id                  String           @id @default(cuid())
-  userId              String           @unique
-  title               String
-  hourlyRate          Decimal          @db.Decimal(10, 2)
-  availability        String           @default("Full-time")
-  experienceYears     Int              @default(0)
-  resume              String?
-  isAvailable         Boolean          @default(true)
-  totalEarned         Decimal          @default(0) @db.Decimal(10, 2)
-  totalJobs           Int              @default(0)
-  avgRating           Float            @default(0)
-  responseTime        Int              @default(24) // in hours
-  successRate         Float            @default(0)
-  stripeAccountId     String?
-  stripeAccountStatus String?          @default("NONE") // NONE, PENDING, VERIFIED
-  
-  user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  skills              FreelancerSkill[]
-  education           Education[]
-  experience          Experience[]
-  certifications      Certification[]
-  portfolio           Portfolio[]
-  languages           Language[]
-  
-  @@index([userId])
-  @@index([hourlyRate])
-  @@index([isAvailable])
-}
-
-model Skill {
-  id          String             @id @default(cuid())
-  name        String             @unique
-  category    String
-  createdAt   DateTime           @default(now())
-  
-  freelancers FreelancerSkill[]
-  jobs        JobSkill[]
-  
-  @@index([name])
-  @@index([category])
-}
-
-model FreelancerSkill {
-  id              String            @id @default(cuid())
-  freelancerId    String
-  skillId         String
-  yearsExperience Int               @default(0)
-  level           String            @default("Beginner") // Beginner, Intermediate, Expert
-  
-  freelancer      FreelancerProfile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
-  skill           Skill             @relation(fields: [skillId], references: [id])
-  
-  @@unique([freelancerId, skillId])
-  @@index([freelancerId])
-  @@index([skillId])
-}
-
-model Education {
-  id           String            @id @default(cuid())
-  freelancerId String
-  institution  String
-  degree       String
-  field        String
-  startDate    DateTime
-  endDate      DateTime?
-  isCurrent    Boolean           @default(false)
-  description  String?
-  
-  freelancer   FreelancerProfile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
-  
-  @@index([freelancerId])
-}
-
-model Experience {
-  id           String            @id @default(cuid())
-  freelancerId String
-  company      String
-  position     String
-  startDate    DateTime
-  endDate      DateTime?
-  isCurrent    Boolean           @default(false)
-  description  String?
-  location     String?
-  
-  freelancer   FreelancerProfile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
-  
-  @@index([freelancerId])
-}
-
-model Certification {
-  id           String            @id @default(cuid())
-  freelancerId String
-  name         String
-  issuer       String
-  issuedAt     DateTime
-  expiresAt    DateTime?
-  credentialId String?
-  credentialUrl String?
-  
-  freelancer   FreelancerProfile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
-  
-  @@index([freelancerId])
-}
-
-model Job {
-  id                String          @id @default(cuid())
-  employerId        String
-  title             String
-  description       String
-  requirements      String[]
-  responsibilities  String[]
-  employmentType    String          // Full-time, Part-time, Contract
-  experienceLevel   String          // Entry, Mid, Senior, Expert
-  salaryMin         Decimal?        @db.Decimal(10, 2)
-  salaryMax         Decimal?        @db.Decimal(10, 2)
-  currency          String          @default("USD")
-  location          String?
-  isRemote          Boolean         @default(true)
-  status            JobStatus       @default(DRAFT)
-  publishedAt       DateTime?
-  expiresAt         DateTime?
-  viewCount         Int             @default(0)
-  applicationCount  Int             @default(0)
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  
-  employer          User            @relation("EmployerJobs", fields: [employerId], references: [id], onDelete: Cascade)
-  applications      Application[]
-  skills            JobSkill[]
-  savedByUsers      SavedJob[]
-  
-  @@index([employerId])
-  @@index([status])
-  @@index([publishedAt])
-  @@index([title])
-}
-
-model JobSkill {
-  id          String   @id @default(cuid())
-  jobId       String
-  skillId     String
-  isRequired  Boolean  @default(true)
-  
-  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  skill       Skill    @relation(fields: [skillId], references: [id])
-  
-  @@unique([jobId, skillId])
-  @@index([jobId])
-  @@index([skillId])
-}
-
-model Application {
-  id              String            @id @default(cuid())
-  jobId           String
-  applicantId     String
-  coverLetter     String
-  proposedRate    Decimal?          @db.Decimal(10, 2)
-  availability    String?
-  status          ApplicationStatus @default(PENDING)
-  appliedAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  
-  job             Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  applicant       User              @relation(fields: [applicantId], references: [id], onDelete: Cascade)
-  conversations   Conversation[]
-  payments        Payment[]
-  
-  @@unique([jobId, applicantId])
-  @@index([jobId])
-  @@index([applicantId])
-  @@index([status])
-}
-
-model SavedJob {
-  id        String   @id @default(cuid())
-  userId    String
-  jobId     String
-  savedAt   DateTime @default(now())
-  
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  
-  @@unique([userId, jobId])
-  @@index([userId])
-  @@index([jobId])
-}
-
-
-model Notification {
-  id        String           @id @default(cuid())
-  userId    String
-  type      NotificationType
-  title     String
-  message   String
-  data      Json?
-  isRead    Boolean          @default(false)
-  createdAt DateTime         @default(now())
-  
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-  @@index([type])
-  @@index([isRead])
-  @@index([createdAt])
-}
-
-model AnalyticsEvent {
-  id        String   @id @default(cuid())
-  event     String
-  userId    String?  @map("user_id")
-  sessionId String?  @map("session_id")
-  properties Json    @default("{}")
-  timestamp DateTime @default(now())
-  ip        String?
-  userAgent String?  @map("user_agent")
-  referer   String?
-  url       String?
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([event])
-  @@index([userId])
-  @@index([sessionId])
-  @@index([timestamp])
-  @@index([event, timestamp])
-  @@map("analytics_events")
-}
-
-model Review {
-  id           String   @id @default(cuid())
-  authorId     String
-  recipientId  String
-  jobId        String?
-  rating       Int      // 1-5
-  title        String
-  comment      String
-  isVerified   Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  author       User     @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  recipient    User     @relation("ReviewRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
-  
-  @@index([authorId])
-  @@index([recipientId])
-  @@index([rating])
-}
-
-model Payment {
-  id              String        @id @default(cuid())
-  userId          String        // The payer (employer)
-  recipientId     String?       // The recipient (freelancer) - optional for non-job payments
-  applicationId   String?       // Link to job application - optional for non-job payments
-  amount          Decimal       @db.Decimal(10, 2)
-  platformFee     Decimal       @db.Decimal(10, 2) @default(0)
-  currency        String        @default("USD")
-  type            String        // subscription, job_payment, featured_listing
-  status          PaymentStatus @default(PENDING)
-  stripePaymentId String?       @unique
-  transactionId   String?       @unique
-  paymentMethod   String?
-  description     String?
-  metadata        Json?
-  paidAt          DateTime?     // When payment was completed
-  processedAt     DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  recipient       User?         @relation("PaymentRecipient", fields: [recipientId], references: [id], onDelete: SetNull)
-  application     Application?  @relation(fields: [applicationId], references: [id], onDelete: SetNull)
-  
-  @@index([userId])
-  @@index([recipientId])
-  @@index([applicationId])
-  @@index([status])
-  @@index([transactionId])
-}
-
-model Subscription {
-  id              String            @id @default(cuid())
-  userId          String            @unique
-  tier            SubscriptionTier  @default(FREE)
-  startDate       DateTime          @default(now())
-  endDate         DateTime?
-  isActive        Boolean           @default(true)
-  jobPostLimit    Int               @default(3)
-  jobPostsUsed    Int               @default(0)
-  featuredPosts   Int               @default(0)
-  autoRenew       Boolean           @default(true)
-  
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-  @@index([tier])
-  @@index([isActive])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  userId       String
-  token        String   @unique
-  userAgent    String?
-  ipAddress    String?
-  expiresAt    DateTime
-  createdAt    DateTime @default(now())
-  
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-  @@index([token])
-  @@index([expiresAt])
-}
-
-model Report {
-  id           String   @id @default(cuid())
-  reporterId   String
-  targetId     String
-  targetType   String   // user, job, review
-  reason       String
-  description  String
-  status       String   @default("pending") // pending, reviewed, resolved, dismissed
-  resolvedAt   DateTime?
-  createdAt    DateTime @default(now())
-  
-  reporter     User     @relation("ReportMaker", fields: [reporterId], references: [id], onDelete: Cascade)
-  target       User     @relation("ReportTarget", fields: [targetId], references: [id], onDelete: Cascade)
-  
-  @@index([reporterId])
-  @@index([targetId])
-  @@index([status])
-}
-
-model Portfolio {
-  id           String            @id @default(cuid())
-  freelancerId String
-  title        String
-  description  String
-  url          String?
-  imageUrl     String?
-  category     String
-  technologies String[]
-  completedAt  DateTime
-  createdAt    DateTime          @default(now())
-  
-  freelancer   FreelancerProfile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
-  
-  @@index([freelancerId])
-  @@index([category])
-}
-
-model Language {
-  id           String            @id @default(cuid())
-  freelancerId String
-  name         String
-  proficiency  String            // Native, Fluent, Professional, Conversational, Basic
-  
-  freelancer   FreelancerProfile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
-  
-  @@unique([freelancerId, name])
-  @@index([freelancerId])
-}
-
-model Conversation {
-  id            String                   @id @default(cuid())
-  applicationId String?
-  createdAt     DateTime                 @default(now())
-  updatedAt     DateTime                 @updatedAt
-  
-  application   Application?             @relation(fields: [applicationId], references: [id], onDelete: SetNull)
-  participants  ConversationParticipant[]
-  messages      Message[]
-  
-  @@index([applicationId])
-  @@index([updatedAt])
-}
-
-model ConversationParticipant {
-  id             String       @id @default(cuid())
-  conversationId String
-  userId         String
-  joinedAt       DateTime     @default(now())
-  
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@unique([conversationId, userId])
-  @@index([conversationId])
-  @@index([userId])
-}
-
-model Message {
-  id             String       @id @default(cuid())
-  conversationId String
-  senderId       String
-  content        String
-  sentAt         DateTime     @default(now())
-  readAt         DateTime?
-  
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  
-  @@index([conversationId])
-  @@index([senderId])
-  @@index([sentAt])
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
 }
