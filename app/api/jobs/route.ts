@@ -126,7 +126,7 @@ export async function GET(req: NextRequest) {
     const offset = (page - 1) * limit
 
     // Build where clause
-    const where: any = {
+    const where: Record<string, unknown> = {
       status: 'ACTIVE',
       publishedAt: {
         lte: new Date()
@@ -157,13 +157,14 @@ export async function GET(req: NextRequest) {
     }
 
     if (minSalary || maxSalary) {
-      where.AND = where.AND || []
+      const andClause = (where.AND as Record<string, unknown>[]) || []
       if (minSalary) {
-        where.AND.push({ salaryMin: { gte: parseFloat(minSalary) } })
+        andClause.push({ salaryMin: { gte: parseFloat(minSalary) } })
       }
       if (maxSalary) {
-        where.AND.push({ salaryMax: { lte: parseFloat(maxSalary) } })
+        andClause.push({ salaryMax: { lte: parseFloat(maxSalary) } })
       }
+      where.AND = andClause
     }
 
     if (isRemote === 'true') {

@@ -88,13 +88,14 @@ export async function POST(req: NextRequest) {
     const payment = await prisma.payment.create({
       data: {
         applicationId,
-        payerId: session.user.id,
+        userId: session.user.id,
         recipientId: application.applicantId,
         amount: amount,
         platformFee: platformFee,
         currency: currency.toUpperCase(),
+        type: 'job_payment',
         status: 'PENDING',
-        stripePaymentIntentId: paymentIntent.id,
+        stripePaymentId: paymentIntent.id,
         description: `Payment for ${application.job.title}`
       }
     })

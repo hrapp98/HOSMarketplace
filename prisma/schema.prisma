@@ -83,6 +83,7 @@ model User {
   savedJobs         SavedJob[]
   reportsMade       Report[]           @relation("ReportMaker")
   reportsReceived   Report[]           @relation("ReportTarget")
+  analyticsEvents   AnalyticsEvent[]
   
   @@index([email])
   @@index([role])
@@ -342,6 +343,29 @@ model Notification {
   @@index([type])
   @@index([isRead])
   @@index([createdAt])
+}
+
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  event     String
+  userId    String?  @map("user_id")
+  sessionId String?  @map("session_id")
+  properties Json    @default("{}")
+  timestamp DateTime @default(now())
+  ip        String?
+  userAgent String?  @map("user_agent")
+  referer   String?
+  url       String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([event])
+  @@index([userId])
+  @@index([sessionId])
+  @@index([timestamp])
+  @@index([event, timestamp])
+  @@map("analytics_events")
 }
 
 model Review {

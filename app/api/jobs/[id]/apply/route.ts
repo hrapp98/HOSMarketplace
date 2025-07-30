@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/app/lib/auth"
 import { prisma } from "@/app/lib/prisma"
+import { sendJobApplicationEmail } from "@/lib/email"
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await auth()
     
     if (!session || session.user.role !== 'FREELANCER') {
@@ -37,7 +39,7 @@ export async function POST(
     // Check if job exists and is active
     const job = await prisma.job.findUnique({
       where: {
-        id: params.id,
+        id: id,
         status: 'ACTIVE'
       }
     })
@@ -52,7 +54,7 @@ export async function POST(
     // Check if user has already applied
     const existingApplication = await prisma.application.findFirst({
       where: {
-        jobId: params.id,
+        jobId: id,
         applicantId: session.user.id
       }
     })
@@ -75,7 +77,7 @@ export async function POST(
     // Create the application
     const application = await prisma.application.create({
       data: {
-        jobId: params.id,
+        jobId: id,
         applicantId: session.user.id,
         coverLetter: coverLetter.trim(),
         proposedRate: proposedRate ? parseFloat(proposedRate) : null,
@@ -89,6 +91,7 @@ export async function POST(
             employer: {
               select: {
                 id: true,
+                email: true,
                 profile: {
                   select: {
                     firstName: true,
@@ -125,12 +128,23 @@ export async function POST(
 
     // Update job application count
     await prisma.job.update({
-      where: { id: params.id },
+      where: { id: id },
       data: { applicationCount: { increment: 1 } }
     })
 
-    // TODO: Send notification to employer
-    // TODO: Send confirmation email to applicant
+    // Send email notification to employer
+    try {
+      await sendJobApplicationEmail({
+        employerEmail: application.job.employer.email,
+        employerName: application.job.employer.profile?.firstName || application.job.employer.employerProfile?.companyName || 'Employer',
+        freelancerName: application.applicant.profile?.firstName || 'Freelancer',
+        jobTitle: application.job.title,
+        applicationId: application.id,
+      })
+    } catch (emailError) {
+      console.error("Failed to send application email:", emailError)
+      // Don't fail the application if email fails
+    }
 
     return NextResponse.json(
       {

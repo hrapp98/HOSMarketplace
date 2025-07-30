@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     
     const skip = (page - 1) * limit
 
-    const where: any = {}
+    const where: Record<string, unknown> = {}
     if (recipientId) where.recipientId = recipientId
     if (authorId) where.authorId = authorId
 

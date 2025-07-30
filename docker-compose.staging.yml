@@ -1,0 +1,122 @@
+# Docker Compose overrides for staging environment
+version: '3.8'
+
+services:
+  # Staging PostgreSQL with moderate optimizations
+  postgres:
+    environment:
+      POSTGRES_DB: hireoverseas_staging
+      POSTGRES_USER: hireoverseas_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    command: >
+      postgres
+      -c max_connections=100
+      -c shared_buffers=128MB
+      -c effective_cache_size=512MB
+      -c maintenance_work_mem=32MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=8MB
+      -c default_statistics_target=100
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    deploy:
+      resources:
+        limits:
+          memory: 512MB
+          cpus: '0.5'
+        reservations:
+          memory: 256MB
+          cpus: '0.25'
+
+  # Staging Redis with basic optimizations
+  redis:
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+    volumes:
+      - redis_staging_data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 256MB
+          cpus: '0.25'
+        reservations:
+          memory: 128MB
+          cpus: '0.125'
+
+  # Staging app configuration
+  app:
+    environment:
+      NODE_ENV: staging
+      # Staging database
+      DATABASE_URL: postgresql://hireoverseas_user:${POSTGRES_PASSWORD}@postgres:5432/hireoverseas_staging?schema=public&connection_limit=5
+      
+      # Staging Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      
+      # Staging auth
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      
+      # External services (staging/test keys)
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      
+      EMAIL_FROM: ${EMAIL_FROM}
+      EMAIL_HOST: ${EMAIL_HOST}
+      EMAIL_PORT: ${EMAIL_PORT}
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASS: ${EMAIL_PASS}
+      
+      # Staging monitoring
+      SENTRY_DSN: ${SENTRY_DSN}
+      
+      # Analytics (staging property)
+      GOOGLE_ANALYTICS_ID: ${GOOGLE_ANALYTICS_ID}
+    
+    deploy:
+      resources:
+        limits:
+          memory: 512MB
+          cpus: '0.5'
+        reservations:
+          memory: 256MB
+          cpus: '0.25'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 60s
+
+  # Staging Nginx with basic configuration
+  nginx:
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - app_uploads:/var/www/uploads:ro
+      - ./nginx/logs:/var/log/nginx
+    deploy:
+      resources:
+        limits:
+          memory: 128MB
+          cpus: '0.25'
+        reservations:
+          memory: 64MB
+          cpus: '0.125'
+
+volumes:
+  postgres_staging_data:
+    driver: local
+  redis_staging_data:
+    driver: local

@@ -3,12 +3,13 @@ import { prisma } from "@/app/lib/prisma"
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const job = await prisma.job.findUnique({
       where: {
-        id: params.id,
+        id: id,
         status: 'ACTIVE'
       },
       include: {
@@ -40,7 +41,7 @@ export async function GET(
 
     // Increment view count
     await prisma.job.update({
-      where: { id: params.id },
+      where: { id: id },
       data: { viewCount: { increment: 1 } }
     })
 

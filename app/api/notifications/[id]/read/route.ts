@@ -4,9 +4,10 @@ import { prisma } from "@/app/lib/prisma"
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await auth()
     
     if (!session) {
@@ -19,7 +20,7 @@ export async function PATCH(
     // Verify the notification belongs to the current user
     const notification = await prisma.notification.findFirst({
       where: {
-        id: params.id,
+        id: id,
         userId: session.user.id
       }
     })
@@ -33,7 +34,7 @@ export async function PATCH(
 
     // Mark as read
     await prisma.notification.update({
-      where: { id: params.id },
+      where: { id: id },
       data: { isRead: true }
     })
 

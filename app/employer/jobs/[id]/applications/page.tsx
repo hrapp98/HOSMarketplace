@@ -193,9 +193,9 @@ export default function JobApplicationsPage() {
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               The job posting you're looking for doesn't exist.
             </p>
-            <Button asChild>
-              <Link href="/employer/jobs">Back to Jobs</Link>
-            </Button>
+            <Link href="/employer/jobs">
+              <Button>Back to Jobs</Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
@@ -331,9 +331,9 @@ export default function JobApplicationsPage() {
               </p>
             </div>
             
-            <Button asChild variant="outline">
-              <Link href={`/jobs/${job.id}`}>View Job</Link>
-            </Button>
+            <Link href={`/jobs/${job.id}`}>
+              <Button variant="outline">View Job</Button>
+            </Link>
           </div>
         </div>
       </div>
@@ -580,11 +580,11 @@ export default function JobApplicationsPage() {
                   </>
                 )}
                 
-                <Button size="sm" variant="outline" asChild>
-                  <Link href={`/talent/${selectedApplication.applicant.id}`}>
+                <Link href={`/talent/${selectedApplication.applicant.id}`}>
+                  <Button size="sm" variant="outline">
                     View Profile
-                  </Link>
-                </Button>
+                  </Button>
+                </Link>
               </div>
             </div>
           </div>

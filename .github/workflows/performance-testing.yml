@@ -1,0 +1,442 @@
+# Performance Testing and Load Testing
+name: Performance Testing
+
+on:
+  schedule:
+    # Run weekly performance tests on Sunday at 3 AM UTC
+    - cron: '0 3 * * 0'
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'pages/**'
+      - 'app/**'
+      - 'package.json'
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of performance test'
+        required: true
+        type: choice
+        options:
+          - lighthouse
+          - load-test
+          - stress-test
+          - all
+      target_environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  lighthouse-audit:
+    name: Lighthouse Performance Audit
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type == 'lighthouse' || github.event.inputs.test_type == 'all' || github.event_name == 'push' || github.event_name == 'schedule'
+    
+    strategy:
+      matrix:
+        page: 
+          - '/'
+          - '/jobs'
+          - '/talent'
+          - '/auth/signin'
+          - '/dashboard'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+        env:
+          SKIP_ENV_VALIDATION: true
+
+      - name: Start application
+        run: |
+          npm start &
+          sleep 30
+        env:
+          NODE_ENV: production
+          PORT: 3000
+
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          urls: |
+            http://localhost:3000${{ matrix.page }}
+          configPath: './lighthouserc.json'
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
+      - name: Upload Lighthouse reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-report-${{ matrix.page }}-${{ github.sha }}
+          path: .lighthouseci/
+          retention-days: 30
+
+  bundle-analysis:
+    name: Bundle Size Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Analyze bundle size
+        run: |
+          npm run build
+          npx next-bundle-analyzer
+
+      - name: Bundle size report
+        uses: andresz1/size-limit-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          package_manager: npm
+
+  load-testing:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type == 'load-test' || github.event.inputs.test_type == 'all' || github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup K6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Create load test script
+        run: |
+          cat > load-test.js << 'EOF'
+          import http from 'k6/http';
+          import { check, sleep } from 'k6';
+          import { Rate } from 'k6/metrics';
+
+          const errorRate = new Rate('errors');
+          const BASE_URL = __ENV.TARGET_URL || 'https://staging.hireoverseas.com';
+
+          export const options = {
+            stages: [
+              { duration: '2m', target: 10 }, // Ramp up
+              { duration: '5m', target: 50 }, // Stay at 50 users
+              { duration: '2m', target: 100 }, // Ramp up to 100 users
+              { duration: '5m', target: 100 }, // Stay at 100 users
+              { duration: '2m', target: 0 }, // Ramp down
+            ],
+            thresholds: {
+              http_req_duration: ['p(95)<2000'], // 95% of requests under 2s
+              http_req_failed: ['rate<0.1'], // Error rate under 10%
+              errors: ['rate<0.1'],
+            },
+          };
+
+          export default function () {
+            // Test homepage
+            let response = http.get(`${BASE_URL}/`);
+            check(response, {
+              'homepage status is 200': (r) => r.status === 200,
+              'homepage response time < 2s': (r) => r.timings.duration < 2000,
+            }) || errorRate.add(1);
+
+            sleep(1);
+
+            // Test jobs page
+            response = http.get(`${BASE_URL}/jobs`);
+            check(response, {
+              'jobs page status is 200': (r) => r.status === 200,
+              'jobs page response time < 3s': (r) => r.timings.duration < 3000,
+            }) || errorRate.add(1);
+
+            sleep(1);
+
+            // Test talent page
+            response = http.get(`${BASE_URL}/talent`);
+            check(response, {
+              'talent page status is 200': (r) => r.status === 200,
+              'talent page response time < 3s': (r) => r.timings.duration < 3000,
+            }) || errorRate.add(1);
+
+            sleep(1);
+
+            // Test API health
+            response = http.get(`${BASE_URL}/api/health`);
+            check(response, {
+              'API health status is 200': (r) => r.status === 200,
+              'API health response time < 500ms': (r) => r.timings.duration < 500,
+            }) || errorRate.add(1);
+
+            sleep(Math.random() * 3 + 1); // Random sleep 1-4 seconds
+          }
+          EOF
+
+      - name: Run load test
+        run: |
+          k6 run load-test.js --out json=load-test-results.json
+        env:
+          TARGET_URL: ${{ github.event.inputs.target_environment == 'production' && secrets.PRODUCTION_NEXTAUTH_URL || secrets.STAGING_NEXTAUTH_URL }}
+
+      - name: Upload load test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-test-results
+          path: load-test-results.json
+          retention-days: 30
+
+  stress-testing:
+    name: Stress Testing
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type == 'stress-test' || github.event.inputs.test_type == 'all'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup K6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Create stress test script
+        run: |
+          cat > stress-test.js << 'EOF'
+          import http from 'k6/http';
+          import { check, sleep } from 'k6';
+          import { Rate } from 'k6/metrics';
+
+          const errorRate = new Rate('errors');
+          const BASE_URL = __ENV.TARGET_URL || 'https://staging.hireoverseas.com';
+
+          export const options = {
+            stages: [
+              { duration: '1m', target: 50 }, // Ramp up to 50 users
+              { duration: '2m', target: 100 }, // Ramp up to 100 users
+              { duration: '2m', target: 200 }, // Ramp up to 200 users
+              { duration: '2m', target: 300 }, // Ramp up to 300 users
+              { duration: '2m', target: 400 }, // Ramp up to 400 users
+              { duration: '5m', target: 400 }, // Stay at 400 users
+              { duration: '2m', target: 0 }, // Ramp down
+            ],
+            thresholds: {
+              http_req_duration: ['p(99)<5000'], // 99% of requests under 5s
+              http_req_failed: ['rate<0.2'], // Error rate under 20%
+            },
+          };
+
+          export default function () {
+            const pages = ['/', '/jobs', '/talent', '/api/health'];
+            const randomPage = pages[Math.floor(Math.random() * pages.length)];
+            
+            const response = http.get(`${BASE_URL}${randomPage}`);
+            check(response, {
+              'status is not 500': (r) => r.status !== 500,
+              'response time < 10s': (r) => r.timings.duration < 10000,
+            }) || errorRate.add(1);
+
+            sleep(Math.random() * 2); // Random sleep 0-2 seconds
+          }
+          EOF
+
+      - name: Run stress test
+        run: |
+          k6 run stress-test.js --out json=stress-test-results.json
+        env:
+          TARGET_URL: ${{ github.event.inputs.target_environment == 'production' && secrets.PRODUCTION_NEXTAUTH_URL || secrets.STAGING_NEXTAUTH_URL }}
+
+      - name: Upload stress test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stress-test-results
+          path: stress-test-results.json
+          retention-days: 30
+
+  database-performance:
+    name: Database Performance Testing
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type == 'all' || github.event_name == 'schedule'
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: hireoverseas_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup test database
+        run: |
+          npx prisma generate
+          npx prisma db push
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hireoverseas_test
+
+      - name: Create performance test script
+        run: |
+          cat > db-performance-test.js << 'EOF'
+          const { PrismaClient } = require('@prisma/client');
+          const prisma = new PrismaClient();
+
+          async function testDatabasePerformance() {
+            console.log('Starting database performance tests...');
+            
+            // Test 1: User creation performance
+            console.time('Create 1000 users');
+            const users = [];
+            for (let i = 0; i < 1000; i++) {
+              users.push({
+                email: `test${i}@example.com`,
+                name: `Test User ${i}`,
+                type: 'FREELANCER',
+              });
+            }
+            await prisma.user.createMany({ data: users });
+            console.timeEnd('Create 1000 users');
+
+            // Test 2: Query performance
+            console.time('Query 100 users');
+            const foundUsers = await prisma.user.findMany({
+              take: 100,
+              include: { profile: true }
+            });
+            console.timeEnd('Query 100 users');
+
+            // Test 3: Complex query performance
+            console.time('Complex query with filters');
+            const complexQuery = await prisma.user.findMany({
+              where: {
+                type: 'FREELANCER',
+                email: { contains: 'test' }
+              },
+              include: {
+                profile: true,
+                applications: true,
+                reviews: true
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 50
+            });
+            console.timeEnd('Complex query with filters');
+
+            console.log(`Query results: ${foundUsers.length} users, ${complexQuery.length} complex results`);
+            
+            await prisma.$disconnect();
+          }
+
+          testDatabasePerformance().catch(console.error);
+          EOF
+
+      - name: Run database performance tests
+        run: node db-performance-test.js
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hireoverseas_test
+
+  generate-report:
+    name: Generate Performance Report
+    runs-on: ubuntu-latest
+    needs: [lighthouse-audit, bundle-analysis, load-testing, stress-testing, database-performance]
+    if: always()
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Generate performance report
+        run: |
+          echo "# Performance Testing Report" > performance-report.md
+          echo "Generated on: $(date)" >> performance-report.md
+          echo "" >> performance-report.md
+          
+          echo "## Test Results Summary" >> performance-report.md
+          echo "- Lighthouse Audit: ${{ needs.lighthouse-audit.result }}" >> performance-report.md
+          echo "- Bundle Analysis: ${{ needs.bundle-analysis.result }}" >> performance-report.md
+          echo "- Load Testing: ${{ needs.load-testing.result }}" >> performance-report.md
+          echo "- Stress Testing: ${{ needs.stress-testing.result }}" >> performance-report.md
+          echo "- Database Performance: ${{ needs.database-performance.result }}" >> performance-report.md
+          echo "" >> performance-report.md
+          
+          # Process load test results if available
+          if [ -f load-test-results/load-test-results.json ]; then
+            echo "## Load Test Results" >> performance-report.md
+            # Add processing of K6 results here
+            echo "Load test data available in artifacts" >> performance-report.md
+            echo "" >> performance-report.md
+          fi
+
+      - name: Upload performance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report
+          path: performance-report.md
+          retention-days: 90
+
+      - name: Notify on performance degradation
+        if: contains(needs.*.result, 'failure')
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#performance'
+          text: |
+            ⚠️ Performance degradation detected in HireOverseas Marketplace!
+            📊 Environment: ${{ github.event.inputs.target_environment || 'staging' }}
+            🔍 Commit: ${{ github.sha }}
+            👤 Triggered by: ${{ github.actor }}
+            📋 Check the performance report artifact for details.
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

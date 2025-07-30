@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/app/lib/auth"
 import { prisma } from "@/app/lib/prisma"
 import { ApplicationStatus } from "@prisma/client"
+import { sendApplicationStatusEmail } from "@/lib/email"
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await auth()
     
     if (!session || session.user.role !== 'EMPLOYER') {
@@ -18,7 +20,7 @@ export async function PATCH(
     }
 
     const body = await req.json()
-    const { status } = body
+    const { status, message } = body
 
     // Validate status
     const validStatuses = ['PENDING', 'SHORTLISTED', 'INTERVIEW', 'ACCEPTED', 'REJECTED']
@@ -32,7 +34,7 @@ export async function PATCH(
     // Check if the application exists and belongs to a job owned by the employer
     const application = await prisma.application.findFirst({
       where: {
-        id: params.id,
+        id: id,
         job: {
           employerId: session.user.id
         }
@@ -69,17 +71,47 @@ export async function PATCH(
     // Update the application status
     const updatedApplication = await prisma.application.update({
       where: {
-        id: params.id
+        id: id
       },
       data: {
         status: status as ApplicationStatus,
         updatedAt: new Date()
+      },
+      include: {
+        applicant: {
+          select: {
+            email: true,
+            profile: {
+              select: {
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
+        },
+        job: {
+          select: {
+            title: true
+          }
+        }
       }
     })
 
-    // TODO: Send notification to the applicant about status change
-    // TODO: If status is ACCEPTED, potentially update other applications to REJECTED
-    // TODO: Send email notification
+    // Send email notification to applicant about status change
+    if (status === 'ACCEPTED' || status === 'REJECTED') {
+      try {
+        await sendApplicationStatusEmail({
+          freelancerEmail: updatedApplication.applicant.email,
+          freelancerName: updatedApplication.applicant.profile?.firstName || 'Freelancer',
+          jobTitle: updatedApplication.job.title,
+          status: status as 'ACCEPTED' | 'REJECTED',
+          message: message,
+        })
+      } catch (emailError) {
+        console.error("Failed to send status email:", emailError)
+        // Don't fail the status update if email fails
+      }
+    }
 
     return NextResponse.json({
       message: "Application status updated successfully",

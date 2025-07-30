@@ -4,9 +4,10 @@ import { prisma } from "@/app/lib/prisma"
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await auth()
     
     if (!session || session.user.role !== 'EMPLOYER') {
@@ -19,7 +20,7 @@ export async function GET(
     // First check if the job belongs to the current employer
     const job = await prisma.job.findUnique({
       where: {
-        id: params.id,
+        id: id,
         employerId: session.user.id
       },
       select: {
@@ -41,7 +42,7 @@ export async function GET(
     // Fetch applications with detailed applicant information
     const applications = await prisma.application.findMany({
       where: {
-        jobId: params.id
+        jobId: id
       },
       include: {
         applicant: {

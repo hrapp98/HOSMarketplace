@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Client Bundle",
+    "path": ".next/static/chunks/pages/*.js",
+    "limit": "250 KB",
+    "webpack": false
+  },
+  {
+    "name": "App Bundle",
+    "path": ".next/static/chunks/app/*.js",
+    "limit": "300 KB",
+    "webpack": false
+  },
+  {
+    "name": "Shared Chunks",
+    "path": ".next/static/chunks/*.js",
+    "limit": "500 KB",
+    "webpack": false
+  }
+]

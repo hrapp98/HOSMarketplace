@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/app/lib/auth"
 import { prisma } from "@/app/lib/prisma"
 import { retrievePaymentIntent } from "@/lib/stripe"
+import { sendPaymentReceivedEmail } from "@/lib/email"
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     // Update payment status in database
     const payment = await prisma.payment.findFirst({
       where: {
-        stripePaymentIntentId: paymentIntentId,
+        stripePaymentId: paymentIntentId,
         applicationId: applicationId
       }
     })
@@ -63,6 +64,17 @@ export async function POST(req: NextRequest) {
     const application = await prisma.application.findUnique({
       where: { id: applicationId },
       include: {
+        applicant: {
+          select: {
+            email: true,
+            profile: {
+              select: {
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
+        },
         job: {
           select: {
             title: true
@@ -75,7 +87,7 @@ export async function POST(req: NextRequest) {
       await prisma.notification.create({
         data: {
           userId: application.applicantId,
-          type: 'PAYMENT_RECEIVED',
+          type: 'PAYMENT',
           title: 'Payment Received',
           message: `You've received payment for ${application.job.title}`,
           data: {
@@ -86,6 +98,20 @@ export async function POST(req: NextRequest) {
           isRead: false
         }
       })
+
+      // Send payment received email
+      try {
+        await sendPaymentReceivedEmail({
+          freelancerEmail: application.applicant.email,
+          freelancerName: application.applicant.profile?.firstName || 'Freelancer',
+          amount: parseFloat(payment.amount.toString()),
+          jobTitle: application.job.title,
+          paymentId: payment.id,
+        })
+      } catch (emailError) {
+        console.error("Failed to send payment email:", emailError)
+        // Don't fail the payment confirmation if email fails
+      }
     }
 
     return NextResponse.json({

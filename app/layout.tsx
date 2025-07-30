@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { SessionProvider } from "next-auth/react";
 import "./globals.css";
+import { ErrorBoundary } from '@/lib/error-boundary';
+import { ErrorFallback } from '@/components/error-fallback';
+import { ClientErrorProvider } from '@/components/client-error-provider';
+import { AnalyticsProvider } from '@/components/analytics/analytics-provider';
 
 export const metadata: Metadata = {
   title: "HireOverseas - Find Top Remote Talent Worldwide",
@@ -34,7 +38,13 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         <SessionProvider>
-          {children}
+          <ClientErrorProvider>
+            <AnalyticsProvider>
+              <ErrorBoundary fallback={<ErrorFallback />}>
+                {children}
+              </ErrorBoundary>
+            </AnalyticsProvider>
+          </ClientErrorProvider>
         </SessionProvider>
       </body>
     </html>

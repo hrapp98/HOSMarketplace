@@ -4,9 +4,10 @@ import { prisma } from "@/app/lib/prisma"
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await auth()
     
     if (!session || session.user.role !== 'FREELANCER') {
@@ -19,7 +20,7 @@ export async function PATCH(
     // Check if the application exists and belongs to the current freelancer
     const application = await prisma.application.findFirst({
       where: {
-        id: params.id,
+        id: id,
         applicantId: session.user.id
       },
       include: {
@@ -50,7 +51,7 @@ export async function PATCH(
     // Update the application status to withdrawn
     const updatedApplication = await prisma.application.update({
       where: {
-        id: params.id
+        id: id
       },
       data: {
         status: 'WITHDRAWN',

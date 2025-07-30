@@ -168,12 +168,12 @@ export default function EmployerJobsPage() {
             {job.skills.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-3">
                 {job.skills.slice(0, 4).map((jobSkill) => (
-                  <Badge key={jobSkill.skill.name} size="xs" variant="default">
+                  <Badge key={jobSkill.skill.name} size="sm" variant="default">
                     {jobSkill.skill.name}
                   </Badge>
                 ))}
                 {job.skills.length > 4 && (
-                  <Badge size="xs" variant="default">
+                  <Badge size="sm" variant="default">
                     +{job.skills.length - 4} more
                   </Badge>
                 )}
@@ -205,28 +205,28 @@ export default function EmployerJobsPage() {
 
         <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-2">
-            <Button size="sm" asChild>
-              <Link href={`/jobs/${job.id}`}>
+            <Link href={`/jobs/${job.id}`}>
+              <Button size="sm">
                 View Job
-              </Link>
-            </Button>
+              </Button>
+            </Link>
             
             {job.status === 'ACTIVE' && job.applicationCount > 0 && (
-              <Button size="sm" variant="outline" asChild>
-                <Link href={`/employer/jobs/${job.id}/applications`}>
+              <Link href={`/employer/jobs/${job.id}/applications`}>
+                <Button size="sm" variant="outline">
                   Applications ({job.applicationCount})
-                </Link>
-              </Button>
+                </Button>
+              </Link>
             )}
           </div>
           
           <div className="flex items-center space-x-2">
             {job.status === 'DRAFT' && (
-              <Button size="sm" variant="outline" asChild>
-                <Link href={`/employer/jobs/${job.id}/edit`}>
+              <Link href={`/employer/jobs/${job.id}/edit`}>
+                <Button size="sm" variant="outline">
                   Edit
-                </Link>
-              </Button>
+                </Button>
+              </Link>
             )}
             
             <Button size="sm" variant="ghost">
@@ -253,9 +253,9 @@ export default function EmployerJobsPage() {
               </p>
             </div>
             
-            <Button asChild>
-              <Link href="/employer/jobs/new">Post a Job</Link>
-            </Button>
+            <Link href="/employer/jobs/new">
+              <Button>Post a Job</Button>
+            </Link>
           </div>
         </div>
       </div>
@@ -308,9 +308,9 @@ export default function EmployerJobsPage() {
               <p className="text-gray-600 dark:text-gray-400 mb-4">
                 Create your first job posting to start finding talented freelancers.
               </p>
-              <Button asChild>
-                <Link href="/employer/jobs/new">Post Your First Job</Link>
-              </Button>
+              <Link href="/employer/jobs/new">
+                <Button>Post Your First Job</Button>
+              </Link>
             </CardContent>
           </Card>
         ) : (

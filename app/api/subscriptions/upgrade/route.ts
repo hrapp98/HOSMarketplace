@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
         planId,
         tier: selectedPlan.tier,
       },
-      customer_email: session.user.email,
+      customer_email: session.user.email || undefined,
     })
 
     // Create payment record

@@ -3,12 +3,13 @@ import { prisma } from "@/app/lib/prisma"
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const freelancer = await prisma.user.findUnique({
       where: {
-        id: params.id,
+        id: id,
         role: 'FREELANCER',
         isActive: true
       },
@@ -45,11 +46,6 @@ export async function GET(
               include: {
                 profile: true,
                 employerProfile: true
-              }
-            },
-            job: {
-              select: {
-                title: true
               }
             }
           }

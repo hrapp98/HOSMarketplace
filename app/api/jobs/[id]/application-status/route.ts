@@ -4,9 +4,10 @@ import { prisma } from "@/app/lib/prisma"
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await auth()
     
     if (!session) {
@@ -16,7 +17,7 @@ export async function GET(
     // Check if user has applied to this job
     const application = await prisma.application.findFirst({
       where: {
-        jobId: params.id,
+        jobId: id,
         applicantId: session.user.id
       },
       select: {

@@ -4,9 +4,10 @@ import { prisma } from "@/app/lib/prisma"
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await auth()
     
     if (!session) {
@@ -19,7 +20,7 @@ export async function PATCH(
     // Verify user is participant in this conversation
     const conversation = await prisma.conversation.findFirst({
       where: {
-        id: params.id,
+        id: id,
         participants: {
           some: {
             userId: session.user.id
@@ -38,7 +39,7 @@ export async function PATCH(
     // Mark all unread messages in this conversation as read
     await prisma.message.updateMany({
       where: {
-        conversationId: params.id,
+        conversationId: id,
         senderId: {
           not: session.user.id
         },

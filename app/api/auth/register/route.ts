@@ -2,11 +2,34 @@ import { NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/app/lib/prisma"
 import { UserRole } from "@prisma/client"
+import { sendWelcomeEmail } from "@/lib/email"
+import { withMiddleware } from "@/lib/middleware"
+import { validateRequest, sanitizeString, sanitizeEmail } from "@/lib/security"
+import { registerValidationRules } from "@/lib/validations/auth"
 
-export async function POST(req: NextRequest) {
+async function registerHandler(req: NextRequest) {
   try {
     const body = await req.json()
-    const { email, password, role, firstName, lastName, country } = body
+    
+    // Validate request data
+    const validationErrors = validateRequest(body, registerValidationRules)
+    if (validationErrors.length > 0) {
+      return NextResponse.json(
+        { 
+          error: "Validation failed", 
+          details: validationErrors 
+        },
+        { status: 400 }
+      )
+    }
+
+    // Sanitize inputs
+    const email = sanitizeEmail(body.email)
+    const password = body.password // Don't sanitize password as it may contain special chars
+    const role = body.role as UserRole
+    const firstName = sanitizeString(body.firstName, 50)
+    const lastName = sanitizeString(body.lastName, 50)
+    const country = body.country.toUpperCase()
 
     if (!email || !password || !role || !firstName || !lastName || !country) {
       return NextResponse.json(
@@ -60,6 +83,18 @@ export async function POST(req: NextRequest) {
 
     const { password: _, ...userWithoutPassword } = user
 
+    // Send welcome email
+    try {
+      await sendWelcomeEmail({
+        email: user.email,
+        name: user.name || user.email.split('@')[0],
+        role: user.role,
+      })
+    } catch (emailError) {
+      console.error("Failed to send welcome email:", emailError)
+      // Don't fail registration if email fails
+    }
+
     return NextResponse.json(
       {
         message: "User created successfully",
@@ -75,3 +110,17 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
+// Apply rate limiting and security middleware
+export const POST = withMiddleware(registerHandler, {
+  rateLimit: {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // 5 registration attempts per window
+  },
+  security: {
+    requireAuth: false,
+    validateCSRF: false,
+    logRequests: true,
+    checkSuspicious: true,
+  },
+})

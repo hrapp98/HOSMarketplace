@@ -1,0 +1,38 @@
+# Global code owners
+* @maintainer
+
+# Frontend components and UI
+/src/components/ @frontend-team @ui-team
+/src/app/ @frontend-team
+/src/styles/ @ui-team
+
+# Backend and API
+/src/lib/ @backend-team
+/src/app/api/ @backend-team
+/prisma/ @database-team @backend-team
+
+# Infrastructure and DevOps
+/.github/ @devops-team
+/docker* @devops-team
+/nginx/ @devops-team
+/monitoring/ @devops-team
+
+# Security and authentication
+/src/lib/auth.ts @security-team @backend-team
+/src/lib/security.ts @security-team
+/src/middleware.ts @security-team
+
+# Database and migrations
+/prisma/migrations/ @database-team @backend-team
+/prisma/seed.ts @database-team
+
+# Testing
+/__tests__/ @qa-team
+/e2e/ @qa-team
+/playwright.config.ts @qa-team
+
+# Configuration files
+/.env.example @devops-team @backend-team
+/next.config.js @frontend-team @devops-team
+/package.json @maintainer
+/README.md @maintainer

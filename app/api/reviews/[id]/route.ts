@@ -4,10 +4,10 @@ import { prisma } from "@/app/lib/prisma"
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const reviewId = params.id
+    const { id: reviewId } = await params
 
     const review = await prisma.review.findUnique({
       where: { id: reviewId },
@@ -79,7 +79,7 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
@@ -91,7 +91,7 @@ export async function PATCH(
       )
     }
 
-    const reviewId = params.id
+    const { id: reviewId } = await params
     const { rating, title, comment } = await req.json()
 
     // Check if review exists and user owns it
@@ -201,7 +201,7 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
@@ -213,7 +213,7 @@ export async function DELETE(
       )
     }
 
-    const reviewId = params.id
+    const { id: reviewId } = await params
 
     // Check if review exists and user owns it
     const existingReview = await prisma.review.findUnique({

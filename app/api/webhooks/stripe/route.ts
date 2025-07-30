@@ -7,7 +7,7 @@ import Stripe from "stripe"
 export async function POST(req: NextRequest) {
   try {
     const body = await req.text()
-    const headersList = headers()
+    const headersList = await headers()
     const signature = headersList.get('stripe-signature')
 
     if (!signature) {
@@ -237,7 +237,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     await prisma.subscription.upsert({
       where: { userId },
       update: {
-        tier,
+        tier: tier as 'FREE' | 'BASIC' | 'PROFESSIONAL' | 'ENTERPRISE',
         jobPostLimit: limits.jobPostLimit,
         featuredPosts: limits.featuredPosts,
         isActive: true,
@@ -247,7 +247,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       },
       create: {
         userId,
-        tier,
+        tier: tier as 'FREE' | 'BASIC' | 'PROFESSIONAL' | 'ENTERPRISE',
         jobPostLimit: limits.jobPostLimit,
         jobPostsUsed: 0,
         featuredPosts: limits.featuredPosts,
@@ -294,7 +294,9 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   try {
-    if (!invoice.subscription) return
+    // Invoice might not have subscription info, skip if missing
+    const subscriptionId = (invoice as any).subscription
+    if (!subscriptionId || typeof subscriptionId !== 'string') return
 
     // Find subscription by Stripe subscription ID
     const subscription = await prisma.subscription.findFirst({

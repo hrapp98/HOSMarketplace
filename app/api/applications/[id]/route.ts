@@ -4,7 +4,7 @@ import { prisma } from "@/app/lib/prisma"
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
@@ -16,7 +16,7 @@ export async function GET(
       )
     }
 
-    const applicationId = params.id
+    const { id: applicationId } = await params
 
     // Fetch application with related data
     const application = await prisma.application.findUnique({
@@ -72,7 +72,7 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
@@ -84,7 +84,7 @@ export async function PATCH(
       )
     }
 
-    const applicationId = params.id
+    const { id: applicationId } = await params
     const { status } = await req.json()
 
     // Verify application exists and user has permission

@@ -1,0 +1,37 @@
+# Docker Compose override for development
+# This file is automatically loaded by docker-compose for development overrides
+version: '3.8'
+
+services:
+  # Development overrides for the app
+  app:
+    build:
+      target: builder
+    environment:
+      NODE_ENV: development
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+    ports:
+      - "3000:3000"
+      - "9229:9229" # Node.js debugging port
+
+  # Development database with exposed ports and relaxed security
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+
+  # Development Redis with exposed ports
+  redis:
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+
+  # Remove nginx in development to allow direct access to Next.js dev server
+  nginx:
+    profiles:
+      - production
